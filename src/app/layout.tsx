@@ -13,17 +13,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "L'artisan idéal",
-  description: "Trouvez le professionnel qualifié près de chez vous",
+  title: {
+    default: "L'artisan idéal",
+    template: "%s | L'artisan idéal",
+  },
+  description:
+    "Trouvez facilement des artisans qualifiés près de chez vous à Madagascar.",
+  keywords: [
+    "artisan Madagascar",
+    "artisan Antananarivo",
+    "plombier",
+    "électricien",
+    "menuisier",
+    "maçon",
+  ],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-screen bg-white font-sans text-gray-900">
+        {children}
+      </body>
     </html>
   );
 }
