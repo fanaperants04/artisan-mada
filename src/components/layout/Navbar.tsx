@@ -1,37 +1,62 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { User } from '@/types/user';
 import { getRedirectPath } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export default function Navbar() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('user');
-      if (stored) {
-        try {
-          setCurrentUser(JSON.parse(stored));
-        } catch {
-          // ignore
-        }
+    const supabase = createClient();
+    let mounted = true;
+
+    const loadUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        if (mounted) setCurrentUser(null);
+        return;
       }
-    }
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('id, email, name, role, phone')
+        .eq('id', user.id)
+        .single();
+
+      if (mounted) setCurrentUser(profile as User | null);
+    };
+
+    loadUser();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      loadUser();
+    });
+
+    return () => {
+      mounted = false;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('user');
-      setCurrentUser(null);
-      window.location.href = '/login';
-    }
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    router.push('/');
+    router.refresh();
   };
 
   const getRoleVariant = (role: string) => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -19,34 +20,149 @@ import {
   Sliders,
   Award,
   Mail,
-  FileText
+  FileText,
+  Activity,
+  AlertCircle,
 } from 'lucide-react';
 
-// Mock initial profile
-const INITIAL_PROFILE = {
-  name: 'Jean Carpentier',
-  category: 'Menuiserie & Agencement',
-  phone: '+261 34 12 345 67',
-  email: 'artisan@mada.mg',
-  location: 'Antananarivo, Ankorondrano',
-  bio: 'Artisan menuisier passionné avec plus de 10 ans d\'expérience dans la fabrication de meubles sur mesure, parquets et travaux de rénovation en bois noble à Madagascar.',
-  isAvailable: true,
-};
+interface Category {
+  id: string;
+  name: string;
+}
+
+interface ArtisanProfile {
+  id: string;
+  name: string;
+  category_id: string;
+  phone: string | null;
+  email: string | null;
+  city: string;
+  region: string;
+  bio: string | null;
+  is_available: boolean;
+}
+
+interface Reputation {
+  avg_rating: number;
+  recommendation_rate: number;
+  punctuality_rate: number;
+  review_count: number;
+}
 
 export default function ArtisanDashboard() {
-  const [activeTab, setActiveTab] = useState<'reputation' | 'profile'>('reputation');
-  const [profile, setProfile] = useState(INITIAL_PROFILE);
-  const [isSaved, setIsSaved] = useState(false);
+  const supabase = createClient();
 
-  const handleProfileChange = (field: keyof typeof INITIAL_PROFILE, value: any) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
+  const [activeTab, setActiveTab] = useState<'reputation' | 'profile'>('reputation');
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [profile, setProfile] = useState<ArtisanProfile | null>(null);
+  const [reputation, setReputation] = useState<Reputation | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setLoading(false);
+      setNotFound(true);
+      return;
+    }
+
+    const [{ data: artisan }, { data: categoriesData }] = await Promise.all([
+      supabase
+        .from('artisans')
+        .select('id, name, category_id, phone, email, city, region, bio, is_available')
+        .eq('user_id', user.id)
+        .single(),
+      supabase.from('categories').select('id, name').order('name'),
+    ]);
+
+    setCategories(categoriesData ?? []);
+
+    if (!artisan) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    setProfile(artisan);
+
+    const { data: reputationData } = await supabase
+      .from('artisan_reputation')
+      .select('avg_rating, recommendation_rate, punctuality_rate, review_count')
+      .eq('artisan_id', artisan.id)
+      .single();
+
+    setReputation(reputationData ?? { avg_rating: 4.5, recommendation_rate: 0, punctuality_rate: 0, review_count: 0 });
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleProfileChange = (field: keyof ArtisanProfile, value: string | boolean) => {
+    setProfile((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile) return;
+    setSaveError('');
+
+    const { error } = await supabase
+      .from('artisans')
+      .update({
+        name: profile.name,
+        category_id: profile.category_id,
+        phone: profile.phone,
+        email: profile.email,
+        city: profile.city,
+        region: profile.region,
+        bio: profile.bio,
+        is_available: profile.is_available,
+      })
+      .eq('id', profile.id);
+
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
+
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        <Activity className="animate-pulse" size={20} />
+        <span className="ml-2 text-sm font-bold">Chargement du profil...</span>
+      </div>
+    );
+  }
+
+  if (notFound || !profile) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-50/50">
+        <Navbar />
+        <main className="flex-1 max-w-xl w-full mx-auto p-4 py-16 text-center space-y-3">
+          <AlertCircle className="mx-auto text-amber-500" size={32} />
+          <h1 className="text-xl font-bold text-gray-900">Aucun profil artisan associé à ce compte</h1>
+          <p className="text-sm text-gray-500">
+            Contactez un administrateur pour rattacher votre compte à une fiche artisan.
+          </p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50/50">
@@ -69,7 +185,7 @@ export default function ArtisanDashboard() {
             <div className="flex items-center gap-3">
               <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                {profile.isAvailable ? 'Disponible pour chantiers' : 'Indisponible'}
+                {profile.is_available ? 'Disponible pour chantiers' : 'Indisponible'}
               </span>
             </div>
           </CardContent>
@@ -84,8 +200,8 @@ export default function ArtisanDashboard() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Note de Réputation</p>
-                <p className="text-3xl font-black text-gray-900 tracking-tight">4.8 / 5</p>
-                <p className="text-xs text-purple-600 font-medium">Évaluation globale</p>
+                <p className="text-3xl font-black text-gray-900 tracking-tight">{reputation?.avg_rating ?? 4.5} / 5</p>
+                <p className="text-xs text-purple-600 font-medium">{reputation?.review_count ?? 0} avis reçus</p>
               </div>
             </CardContent>
           </Card>
@@ -98,7 +214,7 @@ export default function ArtisanDashboard() {
               <div>
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Statut du Profil</p>
                 <p className="text-xl font-bold text-gray-900 truncate max-w-[160px]">{profile.name}</p>
-                <p className="text-xs text-blue-600 font-medium">Profil vérifié à 100%</p>
+                <p className="text-xs text-blue-600 font-medium">Profil actif sur l&apos;annuaire</p>
               </div>
             </CardContent>
           </Card>
@@ -143,21 +259,35 @@ export default function ArtisanDashboard() {
               <CardContent className="space-y-6">
                 <div className="p-6 bg-purple-50/60 rounded-2xl border border-purple-100 flex flex-col md:flex-row justify-between items-center gap-6">
                   <div className="text-center md:text-left">
-                    <p className="text-5xl font-black text-purple-700 tracking-tight">4.8 <span className="text-2xl text-purple-400 font-normal">/ 5</span></p>
+                    <p className="text-5xl font-black text-purple-700 tracking-tight">
+                      {reputation?.avg_rating ?? 4.5} <span className="text-2xl text-purple-400 font-normal">/ 5</span>
+                    </p>
                     <div className="flex items-center justify-center md:justify-start gap-1 my-1">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} size={18} className="fill-amber-400 text-amber-400" />
+                        <Star
+                          key={star}
+                          size={18}
+                          className={
+                            star <= Math.round(reputation?.avg_rating ?? 4.5)
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-gray-200'
+                          }
+                        />
                       ))}
                     </div>
-                    <p className="text-xs font-semibold text-purple-900">Excellente réputation globale</p>
+                    <p className="text-xs font-semibold text-purple-900">
+                      {reputation && reputation.review_count > 0
+                        ? `Basé sur ${reputation.review_count} avis clients`
+                        : "Pas encore d'avis reçu"}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
                     <div className="bg-white p-3.5 rounded-xl border border-purple-100 text-center">
-                      <p className="text-2xl font-bold text-gray-900">98%</p>
+                      <p className="text-2xl font-bold text-gray-900">{reputation?.recommendation_rate ?? 0}%</p>
                       <p className="text-[11px] text-gray-500 font-medium">Recommandation</p>
                     </div>
                     <div className="bg-white p-3.5 rounded-xl border border-purple-100 text-center">
-                      <p className="text-2xl font-bold text-gray-900">100%</p>
+                      <p className="text-2xl font-bold text-gray-900">{reputation?.punctuality_rate ?? 0}%</p>
                       <p className="text-[11px] text-gray-500 font-medium">Ponctualité</p>
                     </div>
                   </div>
@@ -167,7 +297,7 @@ export default function ArtisanDashboard() {
           </div>
         )}
 
-        {/* Tab Content 3: Profile Modification */}
+        {/* Tab Content 2: Profile Modification */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <Card className="bg-white border-gray-100 shadow-sm rounded-2xl">
@@ -185,6 +315,12 @@ export default function ArtisanDashboard() {
                     <div className="p-3.5 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-2 animate-in fade-in duration-200">
                       <Check size={16} className="shrink-0 text-emerald-600" />
                       <span>Vos informations de profil ont été enregistrées avec succès !</span>
+                    </div>
+                  )}
+                  {saveError && (
+                    <div className="p-3.5 text-xs font-bold text-red-700 bg-red-50 rounded-xl border border-red-200 flex items-center gap-2">
+                      <AlertCircle size={16} className="shrink-0 text-red-600" />
+                      <span>{saveError}</span>
                     </div>
                   )}
 
@@ -206,13 +342,18 @@ export default function ArtisanDashboard() {
                       <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
                         <Briefcase size={14} className="text-gray-400" /> Spécialité / Métier
                       </label>
-                      <Input
-                        type="text"
-                        value={profile.category}
-                        onChange={(e) => handleProfileChange('category', e.target.value)}
+                      <select
+                        value={profile.category_id}
+                        onChange={(e) => handleProfileChange('category_id', e.target.value)}
                         required
-                        className="h-10 rounded-xl text-sm"
-                      />
+                        className="w-full h-10 rounded-xl text-sm border border-gray-200 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      >
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="space-y-1.5">
@@ -221,7 +362,7 @@ export default function ArtisanDashboard() {
                       </label>
                       <Input
                         type="text"
-                        value={profile.phone}
+                        value={profile.phone ?? ''}
                         onChange={(e) => handleProfileChange('phone', e.target.value)}
                         required
                         className="h-10 rounded-xl text-sm"
@@ -234,21 +375,34 @@ export default function ArtisanDashboard() {
                       </label>
                       <Input
                         type="email"
-                        value={profile.email}
+                        value={profile.email ?? ''}
                         onChange={(e) => handleProfileChange('email', e.target.value)}
                         required
                         className="h-10 rounded-xl text-sm"
                       />
                     </div>
 
-                    <div className="space-y-1.5 md:col-span-2">
+                    <div className="space-y-1.5">
                       <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                        <MapPin size={14} className="text-gray-400" /> Localisation / Ville
+                        <MapPin size={14} className="text-gray-400" /> Ville / Quartier
                       </label>
                       <Input
                         type="text"
-                        value={profile.location}
-                        onChange={(e) => handleProfileChange('location', e.target.value)}
+                        value={profile.city}
+                        onChange={(e) => handleProfileChange('city', e.target.value)}
+                        required
+                        className="h-10 rounded-xl text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <MapPin size={14} className="text-gray-400" /> Région
+                      </label>
+                      <Input
+                        type="text"
+                        value={profile.region}
+                        onChange={(e) => handleProfileChange('region', e.target.value)}
                         required
                         className="h-10 rounded-xl text-sm"
                       />
@@ -261,10 +415,23 @@ export default function ArtisanDashboard() {
                     </label>
                     <textarea
                       rows={4}
-                      value={profile.bio}
+                      value={profile.bio ?? ''}
                       onChange={(e) => handleProfileChange('bio', e.target.value)}
                       className="w-full p-3 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
                     />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_available"
+                      checked={profile.is_available}
+                      onChange={(e) => handleProfileChange('is_available', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="is_available" className="text-xs font-bold text-gray-700">
+                      Disponible pour de nouveaux chantiers
+                    </label>
                   </div>
 
                   <div className="pt-2 flex justify-end">

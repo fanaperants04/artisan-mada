@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { LogIn, UserCheck, Wrench, Shield, AlertCircle, ArrowRight } from 'lucide-react';
-import { MOCK_USERS } from '@/lib/auth';
+import { LogIn, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -36,23 +34,11 @@ export default function LoginForm() {
         return;
       }
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
-
       router.push(data.redirectTo);
+      router.refresh();
     } catch {
       setError('Impossible de joindre le serveur.');
       setIsLoading(false);
-    }
-  };
-
-  const handleQuickLogin = (role: 'client' | 'artisan' | 'admin') => {
-    const targetUser = MOCK_USERS.find((u) => u.role === role);
-    if (targetUser) {
-      setEmail(targetUser.email);
-      setPassword(targetUser.password);
-      setError('');
     }
   };
 
@@ -119,38 +105,6 @@ export default function LoginForm() {
             )}
           </Button>
         </form>
-
-        {/* Test Rapide */}
-        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              Comptes de démo
-            </span>
-            <Badge variant="outline" className="text-[10px] text-gray-500 font-normal">
-              1 clic pour remplir
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('artisan')}
-              className="flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all text-gray-700 font-medium group"
-            >
-              <Wrench size={18} className="text-amber-600 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] sm:text-xs font-bold text-gray-900">Artisan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin')}
-              className="flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all text-gray-700 font-medium group"
-            >
-              <Shield size={18} className="text-purple-600 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] sm:text-xs font-bold text-gray-900">Admin</span>
-            </button>
-          </div>
-        </div>
       </CardContent>
 
       <CardFooter className="justify-center bg-gray-50/80 border-t border-gray-100 py-3 sm:py-3.5 text-xs text-gray-400 font-medium">
