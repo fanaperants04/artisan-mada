@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,185 +26,217 @@ import {
   PieChart,
   TrendingUp,
   MapPin,
-  Activity
+  Activity,
 } from 'lucide-react';
 
-// Mock initial pending artisan verification dossiers
-const INITIAL_PENDING_DOSSIERS = [
-  {
-    id: 'DOS-101',
-    name: 'Ravao Ébéniste',
-    category: 'Menuiserie',
-    location: 'Antananarivo, Ankorondrano',
-    date: '01 Sept 2026',
-    phone: '+261 34 55 666 77',
-    email: 'ravao.ebeniste@gmail.com',
-    status: 'En attente',
-  },
-  {
-    id: 'DOS-102',
-    name: 'Bako Peinture',
-    category: 'Peinture & Décoration',
-    location: 'Majunga',
-    date: '31 Août 2026',
-    phone: '+261 32 88 999 00',
-    email: 'bako.peinture@mada.mg',
-    status: 'En attente',
-  },
-  {
-    id: 'DOS-103',
-    name: 'Tojo Plomberie',
-    category: 'Plomberie & Sanitaire',
-    location: 'Antsirabe',
-    date: '30 Août 2026',
-    phone: '+261 33 11 222 33',
-    email: 'tojo.plomberie@gmail.com',
-    status: 'En attente',
-  },
-];
+interface Category {
+  id: string;
+  name: string;
+}
 
-// Mock registered artisans
-const INITIAL_ARTISANS = [
-  {
-    id: 'ART-001',
-    name: 'Jean Carpentier',
-    category: 'Menuiserie & Agencement',
-    location: 'Antananarivo',
-    phone: '+261 34 12 345 67',
-    email: 'artisan@mada.mg',
-    status: 'Vérifié',
-  },
-  {
-    id: 'ART-002',
-    name: 'Marie Électricienne',
-    category: 'Électricité',
-    location: 'Antananarivo',
-    phone: '+261 32 12 345 67',
-    email: 'marie.elec@mada.mg',
-    status: 'Vérifié',
-  },
-  {
-    id: 'ART-003',
-    name: 'Ahmed Plombier',
-    category: 'Plomberie',
-    location: 'Antananarivo',
-    phone: '+261 30 12 345 67',
-    email: 'ahmed.plombier@mada.mg',
-    status: 'Vérifié',
-  },
-  {
-    id: 'ART-004',
-    name: 'Luc BTP',
-    category: 'Maçonnerie & Rénovation',
-    location: 'Tamatave',
-    phone: '+261 34 99 888 77',
-    email: 'luc.btp@gmail.com',
-    status: 'En attente',
-  },
-];
+interface Dossier {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  phone: string;
+  email: string;
+  status: string;
+  category_id: string;
+  created_at: string;
+}
 
-// Mock Monthly Registration Growth data for Chart
-const MONTHLY_REGISTRATIONS = [
-  { month: 'Jan', count: 45 },
-  { month: 'Fév', count: 62 },
-  { month: 'Mar', count: 85 },
-  { month: 'Avr', count: 110 },
-  { month: 'Mai', count: 140 },
-  { month: 'Juin', count: 175 },
-  { month: 'Juil', count: 210 },
-  { month: 'Août', count: 260 },
-  { month: 'Sept', count: 310 },
-];
+interface Artisan {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  phone: string | null;
+  email: string | null;
+  status: string;
+  category_id: string;
+  created_at: string;
+}
 
-// Mock Category Breakdown data for Chart
-const CATEGORY_BREAKDOWN = [
-  { name: 'Menuiserie & Bois', percentage: 35, count: 52, colorClass: 'bg-amber-500', borderClass: 'border-amber-500' },
-  { name: 'Électricité & Énergie', percentage: 25, count: 38, colorClass: 'bg-blue-500', borderClass: 'border-blue-500' },
-  { name: 'Plomberie & Sanitaire', percentage: 20, count: 30, colorClass: 'bg-emerald-500', borderClass: 'border-emerald-500' },
-  { name: 'Peinture & Déco', percentage: 12, count: 18, colorClass: 'bg-purple-500', borderClass: 'border-purple-500' },
-  { name: 'Maçonnerie & BTP', percentage: 8, count: 12, colorClass: 'bg-rose-500', borderClass: 'border-rose-500' },
-];
+interface CategoryStat {
+  category_id: string;
+  category_name: string;
+  artisan_count: number;
+  percentage: number | null;
+}
 
-// Mock Regional Breakdown data for Chart
-const REGIONAL_BREAKDOWN = [
-  { region: 'Antananarivo (Analamanga)', percentage: 56, count: 84 },
-  { region: 'Tamatave (Atsinanana)', percentage: 18, count: 27 },
-  { region: 'Majunga (Boeny)', percentage: 12, count: 18 },
-  { region: 'Antsirabe (Vakinankaratra)', percentage: 9, count: 14 },
-  { region: 'Fianarantsoa (Matsiatra)', percentage: 5, count: 7 },
-];
+interface RegionStat {
+  region: string;
+  artisan_count: number;
+  percentage: number | null;
+}
+
+const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+const CHART_COLORS = ['bg-amber-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-rose-500', 'bg-cyan-500'];
 
 export default function AdminDashboard() {
+  const supabase = createClient();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<'analytics' | 'pending' | 'artisans'>('analytics');
-  const [pendingDossiers, setPendingDossiers] = useState(INITIAL_PENDING_DOSSIERS);
-  const [artisans, setArtisans] = useState(INITIAL_ARTISANS);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [pendingDossiers, setPendingDossiers] = useState<Dossier[]>([]);
+  const [artisans, setArtisans] = useState<Artisan[]>([]);
+  const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
+  const [regionStats, setRegionStats] = useState<RegionStat[]>([]);
+  const [totalArtisansEver, setTotalArtisansEver] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
+  const [adminId, setAdminId] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleValidateDossier = (dossierId: string) => {
-    const dossier = pendingDossiers.find((d) => d.id === dossierId);
-    if (!dossier) return;
+  const categoryNameFor = useCallback(
+    (categoryId: string) => categories.find((c) => c.id === categoryId)?.name ?? '—',
+    [categories]
+  );
 
-    setPendingDossiers((prev) => prev.filter((d) => d.id !== dossierId));
-    setArtisans((prev) => [
-      ...prev,
-      {
-        id: `ART-${Date.now().toString().slice(-3)}`,
-        name: dossier.name,
-        category: dossier.category,
-        location: dossier.location,
-        phone: dossier.phone,
-        email: dossier.email,
-        status: 'Vérifié',
-      },
+  const loadData = useCallback(async () => {
+    setLoading(true);
+
+    const [
+      { data: userData },
+      { data: categoriesData },
+      { data: dossiersData },
+      { data: artisansData },
+      { data: categoryStatsData },
+      { data: regionStatsData },
+      { count: totalCount },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('categories').select('id, name').order('name'),
+      supabase
+        .from('pending_dossiers')
+        .select('id, name, city, region, phone, email, status, category_id, created_at')
+        .eq('status', 'En attente')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('artisans')
+        .select('id, name, city, region, phone, email, status, category_id, created_at')
+        .order('created_at', { ascending: false }),
+      supabase.from('category_stats').select('*'),
+      supabase.from('region_stats').select('*'),
+      supabase.from('artisans').select('id', { count: 'exact', head: true }),
     ]);
 
+    setAdminId(userData.user?.id ?? null);
+    setCategories(categoriesData ?? []);
+    setPendingDossiers(dossiersData ?? []);
+    setArtisans(artisansData ?? []);
+    setCategoryStats((categoryStatsData ?? []).filter((c) => c.artisan_count > 0));
+    setRegionStats(regionStatsData ?? []);
+    setTotalArtisansEver(totalCount ?? 0);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const monthlyRegistrations = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of artisans) {
+      const d = new Date(a.created_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .map(([key, count]) => {
+        const [, month] = key.split('-');
+        return { month: MONTH_LABELS[Number(month)], count };
+      });
+  }, [artisans]);
+
+  const maxRegCount = Math.max(1, ...monthlyRegistrations.map((d) => d.count));
+
+  const handleValidateDossier = async (dossier: Dossier) => {
+    const { error: insertError } = await supabase.from('artisans').insert({
+      name: dossier.name,
+      category_id: dossier.category_id,
+      city: dossier.city,
+      region: dossier.region,
+      phone: dossier.phone,
+      email: dossier.email,
+      status: 'Vérifié',
+    });
+
+    if (insertError) {
+      showNotification(`Erreur lors de la validation : ${insertError.message}`);
+      return;
+    }
+
+    await supabase
+      .from('pending_dossiers')
+      .update({ status: 'Validé', reviewed_by: adminId, reviewed_at: new Date().toISOString() })
+      .eq('id', dossier.id);
+
+    setPendingDossiers((prev) => prev.filter((d) => d.id !== dossier.id));
     showNotification(`Le dossier de ${dossier.name} a été validé avec succès.`);
+    loadData();
   };
 
-  const handleRejectDossier = (dossierId: string) => {
-    const dossier = pendingDossiers.find((d) => d.id === dossierId);
-    if (!dossier) return;
+  const handleRejectDossier = async (dossier: Dossier) => {
+    await supabase
+      .from('pending_dossiers')
+      .update({ status: 'Refusé', reviewed_by: adminId, reviewed_at: new Date().toISOString() })
+      .eq('id', dossier.id);
 
-    setPendingDossiers((prev) => prev.filter((d) => d.id !== dossierId));
+    setPendingDossiers((prev) => prev.filter((d) => d.id !== dossier.id));
     showNotification(`Le dossier de ${dossier.name} a été rejeté.`);
   };
 
-  const handleToggleStatus = (artisanId: string) => {
-    setArtisans((prev) =>
-      prev.map((a) => {
-        if (a.id === artisanId) {
-          const newStatus = a.status === 'Vérifié' ? 'En attente' : 'Vérifié';
-          showNotification(`Le statut de ${a.name} est maintenant: ${newStatus}`);
-          return { ...a, status: newStatus };
-        }
-        return a;
-      })
-    );
+  const handleToggleStatus = async (artisan: Artisan) => {
+    const newStatus = artisan.status === 'Vérifié' ? 'En attente' : 'Vérifié';
+    const { error } = await supabase.from('artisans').update({ status: newStatus }).eq('id', artisan.id);
+
+    if (error) {
+      showNotification(`Erreur : ${error.message}`);
+      return;
+    }
+
+    setArtisans((prev) => prev.map((a) => (a.id === artisan.id ? { ...a, status: newStatus } : a)));
+    showNotification(`Le statut de ${artisan.name} est maintenant : ${newStatus}`);
   };
 
-  const handleDeleteArtisan = (artisanId: string) => {
-    const target = artisans.find((a) => a.id === artisanId);
-    setArtisans((prev) => prev.filter((a) => a.id !== artisanId));
-    if (target) {
-      showNotification(`L'artisan ${target.name} a été supprimé.`);
+  const handleDeleteArtisan = async (artisan: Artisan) => {
+    const { error } = await supabase.from('artisans').delete().eq('id', artisan.id);
+
+    if (error) {
+      showNotification(`Erreur : ${error.message}`);
+      return;
     }
+
+    setArtisans((prev) => prev.filter((a) => a.id !== artisan.id));
+    showNotification(`L'artisan ${artisan.name} a été supprimé.`);
   };
 
   const filteredArtisans = artisans.filter(
     (a) =>
       a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.location.toLowerCase().includes(searchTerm.toLowerCase())
+      categoryNameFor(a.category_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.city.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const verifiedCount = artisans.filter((a) => a.status === 'Vérifié').length;
-  const maxRegCount = Math.max(...MONTHLY_REGISTRATIONS.map((d) => d.count));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
+        <Activity className="animate-pulse" size={20} />
+        <span className="ml-2 text-sm font-bold">Chargement du tableau de bord...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 dark">
@@ -226,12 +260,16 @@ export default function AdminDashboard() {
           >
             <ArrowLeft size={14} /> Retour au site
           </Link>
-          <Link
-            href="/login"
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push('/login');
+              router.refresh();
+            }}
             className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-950/40 border border-red-900/30 transition"
           >
             <LogOut size={14} /> Déconnexion
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -270,9 +308,9 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Inscriptions</p>
-                <p className="text-3xl font-black text-white tracking-tight">{artisans.length + 500}</p>
+                <p className="text-3xl font-black text-white tracking-tight">{totalArtisansEver}</p>
                 <p className="text-xs text-purple-400 font-medium flex items-center gap-1">
-                  <TrendingUp size={12} /> +24% ce mois-ci
+                  <TrendingUp size={12} /> Toutes périodes confondues
                 </p>
               </div>
             </CardContent>
@@ -351,35 +389,38 @@ export default function AdminDashboard() {
                       <BarChart3 className="text-purple-400" size={20} /> Évolution des Inscriptions Mensuelles
                     </CardTitle>
                     <CardDescription className="text-slate-400">
-                      Croissance cumulée du nombre de comptes enregistrés sur ArtisansMada en 2026.
+                      Nombre d&apos;artisans enregistrés sur ArtisansMada, par mois de création.
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="bg-purple-950/60 border-purple-800 text-purple-300 text-xs font-semibold">
-                    2026 • Madagascar
+                    Madagascar
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                {/* SVG Visual Bar Chart */}
-                <div className="h-64 flex items-end justify-between gap-2 sm:gap-4 pt-8 pb-2 px-2 border-b border-slate-800">
-                  {MONTHLY_REGISTRATIONS.map((item, idx) => {
-                    const heightPercent = Math.round((item.count / maxRegCount) * 100);
-                    return (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
-                        <span className="text-[10px] font-mono font-bold text-purple-300 opacity-0 group-hover:opacity-100 transition-opacity bg-purple-950/90 px-1.5 py-0.5 rounded border border-purple-800/60">
-                          {item.count}
-                        </span>
-                        <div
-                          style={{ height: `${heightPercent}%` }}
-                          className="w-full bg-gradient-to-t from-purple-700 to-purple-500 rounded-t-lg group-hover:from-purple-600 group-hover:to-purple-400 transition-all duration-300 shadow-md shadow-purple-950/50"
-                        />
-                        <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
-                          {item.month}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {monthlyRegistrations.length === 0 ? (
+                  <p className="text-center text-slate-500 text-sm py-10">Aucune donnée d&apos;inscription pour le moment.</p>
+                ) : (
+                  <div className="h-64 flex items-end justify-between gap-2 sm:gap-4 pt-8 pb-2 px-2 border-b border-slate-800">
+                    {monthlyRegistrations.map((item, idx) => {
+                      const heightPercent = Math.round((item.count / maxRegCount) * 100);
+                      return (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                          <span className="text-[10px] font-mono font-bold text-purple-300 opacity-0 group-hover:opacity-100 transition-opacity bg-purple-950/90 px-1.5 py-0.5 rounded border border-purple-800/60">
+                            {item.count}
+                          </span>
+                          <div
+                            style={{ height: `${heightPercent}%` }}
+                            className="w-full bg-gradient-to-t from-purple-700 to-purple-500 rounded-t-lg group-hover:from-purple-600 group-hover:to-purple-400 transition-all duration-300 shadow-md shadow-purple-950/50"
+                          />
+                          <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
+                            {item.month}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -392,29 +433,33 @@ export default function AdminDashboard() {
                     <PieChart className="text-blue-400" size={18} /> Répartition par Spécialité
                   </CardTitle>
                   <CardDescription className="text-slate-400">
-                    Proportion des artisans certifiés selon leur secteur d'activité.
+                    Proportion des artisans certifiés selon leur secteur d&apos;activité.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {CATEGORY_BREAKDOWN.map((cat, idx) => (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-slate-200 flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${cat.colorClass}`}></span>
-                          {cat.name}
-                        </span>
-                        <span className="text-slate-400 font-mono">
-                          {cat.count} artisans ({cat.percentage}%)
-                        </span>
+                  {categoryStats.length === 0 ? (
+                    <p className="text-center text-slate-500 text-sm py-6">Aucun artisan certifié pour le moment.</p>
+                  ) : (
+                    categoryStats.map((cat, idx) => (
+                      <div key={cat.category_id} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-200 flex items-center gap-2">
+                            <span className={`w-2.5 h-2.5 rounded-full ${CHART_COLORS[idx % CHART_COLORS.length]}`}></span>
+                            {cat.category_name}
+                          </span>
+                          <span className="text-slate-400 font-mono">
+                            {cat.artisan_count} artisans ({cat.percentage ?? 0}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                          <div
+                            style={{ width: `${cat.percentage ?? 0}%` }}
+                            className={`h-full rounded-full ${CHART_COLORS[idx % CHART_COLORS.length]} transition-all duration-500`}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                        <div
-                          style={{ width: `${cat.percentage}%` }}
-                          className={`h-full rounded-full ${cat.colorClass} transition-all duration-500`}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
 
@@ -429,22 +474,26 @@ export default function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {REGIONAL_BREAKDOWN.map((reg, idx) => (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-slate-200">{reg.region}</span>
-                        <span className="text-emerald-400 font-mono">
-                          {reg.count} ({reg.percentage}%)
-                        </span>
+                  {regionStats.length === 0 ? (
+                    <p className="text-center text-slate-500 text-sm py-6">Aucun artisan certifié pour le moment.</p>
+                  ) : (
+                    regionStats.map((reg, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-200">{reg.region}</span>
+                          <span className="text-emerald-400 font-mono">
+                            {reg.artisan_count} ({reg.percentage ?? 0}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                          <div
+                            style={{ width: `${reg.percentage ?? 0}%` }}
+                            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                        <div
-                          style={{ width: `${reg.percentage}%` }}
-                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -460,7 +509,7 @@ export default function AdminDashboard() {
                   <FileCheck className="text-amber-400" size={20} /> Dossiers en attente de vérification
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  Examinez et validez les nouvelles demandes d'inscription professionnelle des artisans.
+                  Examinez et validez les nouvelles demandes d&apos;inscription professionnelle des artisans.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -481,26 +530,26 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-2">
                             <span className="font-extrabold text-white text-base">{dossier.name}</span>
                             <span className="text-[10px] px-2 py-0.5 font-bold rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/60">
-                              {dossier.category}
+                              {categoryNameFor(dossier.category_id)}
                             </span>
                           </div>
                           <p className="text-xs text-slate-300 font-medium">
-                            📍 {dossier.location} • 📞 {dossier.phone} • ✉️ {dossier.email}
+                            📍 {dossier.city} ({dossier.region}) • 📞 {dossier.phone} • ✉️ {dossier.email}
                           </p>
                           <span className="text-[11px] text-slate-500 block font-mono">
-                            Dossier soumis le : {dossier.date} ({dossier.id})
+                            Dossier soumis le : {new Date(dossier.created_at).toLocaleDateString('fr-FR')}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2 w-full md:w-auto">
                           <Button
-                            onClick={() => handleValidateDossier(dossier.id)}
+                            onClick={() => handleValidateDossier(dossier)}
                             className="flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-md"
                           >
                             <CheckCircle2 size={16} /> Valider
                           </Button>
                           <Button
-                            onClick={() => handleRejectDossier(dossier.id)}
+                            onClick={() => handleRejectDossier(dossier)}
                             variant="outline"
                             className="flex-1 md:flex-initial bg-slate-900 text-red-400 border-red-950 hover:bg-red-950/40 font-bold text-xs h-9 rounded-xl gap-1.5"
                           >
@@ -558,10 +607,10 @@ export default function AdminDashboard() {
                         <tr key={artisan.id} className="hover:bg-slate-800/40 transition-colors">
                           <td className="p-3">
                             <span className="font-bold text-white block">{artisan.name}</span>
-                            <span className="text-[11px] text-slate-500 font-mono">{artisan.id}</span>
+                            <span className="text-[11px] text-slate-500 font-mono">{artisan.id.slice(0, 8)}</span>
                           </td>
-                          <td className="p-3 font-medium text-slate-300">{artisan.category}</td>
-                          <td className="p-3 text-xs text-slate-400">{artisan.location}</td>
+                          <td className="p-3 font-medium text-slate-300">{categoryNameFor(artisan.category_id)}</td>
+                          <td className="p-3 text-xs text-slate-400">{artisan.city}</td>
                           <td className="p-3 text-xs text-slate-400">{artisan.phone}</td>
                           <td className="p-3">
                             <span
@@ -579,7 +628,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleToggleStatus(artisan.id)}
+                                onClick={() => handleToggleStatus(artisan)}
                                 title="Changer le statut"
                                 className="h-8 px-2.5 text-xs font-bold text-blue-400 hover:bg-blue-950/50 hover:text-blue-300"
                               >
@@ -592,7 +641,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDeleteArtisan(artisan.id)}
+                                onClick={() => handleDeleteArtisan(artisan)}
                                 title="Supprimer"
                                 className="h-8 px-2 text-xs font-bold text-red-400 hover:bg-red-950/50 hover:text-red-300"
                               >

@@ -31,7 +31,7 @@ export default function Hero() {
         {/* Title */}
         <div className="text-center mb-8 sm:mb-10 space-y-3 sm:space-y-4">
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-gray-900 tracking-tight leading-tight">
-            Trouvez l'artisan idéal <br className="hidden sm:inline" />
+            Trouvez l&apos;artisan idéal <br className="hidden sm:inline" />
             <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               en toute confiance
             </span>
