@@ -114,7 +114,7 @@ export default function ArtisanDashboard() {
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            <Star size={16} /> Note & Réputation
+            <Star size={16} /> Note
           </button>
           <button
             onClick={() => setActiveTab('profile')}
