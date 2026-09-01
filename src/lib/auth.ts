@@ -29,8 +29,6 @@ export const MOCK_USERS: (User & { password: string })[] = [
 
 export function getRedirectPath(role: UserRole): string {
   switch (role) {
-    case 'client':
-      return '/dashboard/client';
     case 'artisan':
       return '/dashboard/artisan';
     case 'admin':

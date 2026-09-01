@@ -120,9 +120,6 @@ export default function Navbar() {
           <Link href="/#categories" className="text-gray-800 hover:text-blue-600 py-1 text-base font-semibold" onClick={() => setIsOpen(false)}>
             Catégories
           </Link>
-          <Link href="/#artisans" className="text-gray-800 hover:text-blue-600 py-1 text-base font-semibold" onClick={() => setIsOpen(false)}>
-            Artisans à la une
-          </Link>
 
           {currentUser ? (
             <div className="pt-3 border-t border-gray-100 flex flex-col gap-3">
