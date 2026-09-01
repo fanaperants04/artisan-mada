@@ -66,7 +66,7 @@ export default function LoginForm() {
           Espace Connexion
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm text-gray-500 max-w-xs mx-auto mt-1">
-          Connectez-vous pour accéder à votre tableau de bord dédié (Client, Artisan ou Admin)
+          Connectez-vous pour accéder à votre tableau de bord dédié (Artisan ou Admin)
         </CardDescription>
       </CardHeader>
 
@@ -131,16 +131,7 @@ export default function LoginForm() {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('client')}
-              className="flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all text-gray-700 font-medium group"
-            >
-              <UserCheck size={18} className="text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] sm:text-xs font-bold text-gray-900">Client</span>
-            </button>
-
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => handleQuickLogin('artisan')}
