@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Hammer, Zap, Wrench, Building2, Paintbrush, Home, ArrowRight, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,25 +51,28 @@ export default function Categories() {
             const Icon = ICONS[cat.icon] ?? Hammer;
             const color = COLORS[idx % COLORS.length];
             return (
-              <Card
+              <Link
                 key={cat.id}
-                className="group relative cursor-pointer border border-gray-100 bg-white hover:bg-gradient-to-b hover:from-blue-50/50 hover:to-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg rounded-2xl"
+                href={`/artisans?category=${encodeURIComponent(cat.name)}`}
+                className="block"
               >
-                <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center">
-                  <div className={`w-12 sm:w-14 h-12 sm:h-14 rounded-2xl border ${color} flex items-center justify-center mb-2.5 sm:mb-3 shadow-xs transition-transform group-hover:scale-110 shrink-0`}>
-                    <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-xs sm:text-sm md:text-base group-hover:text-blue-600 transition-colors line-clamp-1">
-                    {cat.name}
-                  </h3>
-                  <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">
-                    {countFor(cat.id)} artisans
-                  </span>
-                  <div className="mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hidden sm:block">
-                    <ArrowRight size={14} />
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="group relative cursor-pointer border border-gray-100 bg-white hover:bg-gradient-to-b hover:from-blue-50/50 hover:to-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg rounded-2xl">
+                  <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center">
+                    <div className={`w-12 sm:w-14 h-12 sm:h-14 rounded-2xl border ${color} flex items-center justify-center mb-2.5 sm:mb-3 shadow-xs transition-transform group-hover:scale-110 shrink-0`}>
+                      <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-xs sm:text-sm md:text-base group-hover:text-blue-600 transition-colors line-clamp-1">
+                      {cat.name}
+                    </h3>
+                    <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">
+                      {countFor(cat.id)} artisans
+                    </span>
+                    <div className="mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hidden sm:block">
+                      <ArrowRight size={14} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>

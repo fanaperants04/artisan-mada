@@ -17,6 +17,7 @@ export default async function ArtisansPage({
   const selectedStatus = typeof params.status === 'string' ? params.status : '';
   const selectedCity = typeof params.city === 'string' ? params.city : '';
   const search = typeof params.q === 'string' ? params.q : '';
+  const sortBy = typeof params.sort === 'string' ? params.sort : 'name';
 
   const allCraftspeople = await db.select().from(craftspeople);
 
@@ -33,14 +34,29 @@ export default async function ArtisansPage({
   const categories = [...new Set(artisans.map((artisan) => artisan.category).filter(Boolean))].sort();
   const regions = [...new Set(artisans.map((artisan) => artisan.location).filter(Boolean))].sort();
 
-  const filteredArtisans = artisans.filter((artisan) => {
-    const matchesCategory = selectedCategory ? artisan.category === selectedCategory : true;
-    const matchesRegion = selectedRegion ? artisan.location === selectedRegion : true;
-    const matchesCity = selectedCity ? artisan.location.toLowerCase().includes(selectedCity.toLowerCase()) : true;
-    const matchesSearch = search ? artisan.name.toLowerCase().includes(search.toLowerCase()) : true;
-    const matchesStatus = selectedStatus && selectedStatus !== 'Tous' ? artisan.rating >= 4.5 : true;
-    return matchesCategory && matchesRegion && matchesCity && matchesSearch && matchesStatus;
-  });
+  const filteredArtisans = artisans
+    .filter((artisan) => {
+      const matchesCategory = selectedCategory ? artisan.category === selectedCategory : true;
+      const matchesRegion = selectedRegion ? artisan.location === selectedRegion : true;
+      const matchesCity = selectedCity ? artisan.location.toLowerCase().includes(selectedCity.toLowerCase()) : true;
+      const matchesSearch = search ? artisan.name.toLowerCase().includes(search.toLowerCase()) || artisan.category.toLowerCase().includes(search.toLowerCase()) : true;
+      const matchesStatus = selectedStatus && selectedStatus !== 'Tous' ? artisan.rating >= 4.5 : true;
+      return matchesCategory && matchesRegion && matchesCity && matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'category':
+          return a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
+        case 'location':
+          return a.location.localeCompare(b.location) || a.name.localeCompare(b.name);
+        case 'rating':
+          return (b.rating ?? 0) - (a.rating ?? 0);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -73,7 +89,7 @@ export default async function ArtisansPage({
                     type="text"
                     name="q"
                     defaultValue={search}
-                    placeholder="Nom de l'artisan"
+                    placeholder="Nom ou catégorie"
                     className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                   />
                 </div>
@@ -117,17 +133,18 @@ export default async function ArtisansPage({
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Statut
+                  Trier par
                 </label>
                 <select
-                  name="status"
-                  defaultValue={selectedStatus}
+                  name="sort"
+                  defaultValue={sortBy}
                   className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 >
-                  <option value="">Tous</option>
-                  <option value="Vérifié">Vérifié</option>
-                  <option value="En attente">En attente</option>
-                  <option value="Suspendu">Suspendu</option>
+                  <option value="name">Nom A-Z</option>
+                  <option value="name-desc">Nom Z-A</option>
+                  <option value="category">Catégorie</option>
+                  <option value="location">Localisation</option>
+                  <option value="rating">Note</option>
                 </select>
               </div>
             </div>
@@ -162,6 +179,24 @@ export default async function ArtisansPage({
               </div>
             </div>
           </form>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            <a
+              href="/artisans"
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${!selectedCategory ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:text-blue-600'}`}
+            >
+              Toutes
+            </a>
+            {categories.map((category) => (
+              <a
+                key={category}
+                href={`/artisans?category=${encodeURIComponent(category)}${search ? `&q=${encodeURIComponent(search)}` : ''}${selectedRegion ? `&region=${encodeURIComponent(selectedRegion)}` : ''}${selectedCity ? `&city=${encodeURIComponent(selectedCity)}` : ''}${selectedStatus ? `&status=${encodeURIComponent(selectedStatus)}` : ''}${sortBy ? `&sort=${encodeURIComponent(sortBy)}` : ''}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${selectedCategory === category ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:text-blue-600'}`}
+              >
+                {category}
+              </a>
+            ))}
+          </div>
 
           <div className="mb-4 text-sm text-gray-600">
             {filteredArtisans.length} artisan(s) trouvé(s)
