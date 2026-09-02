@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@/db/client';
+import { users } from '@/db/schema';
 import { getRedirectPath } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -14,43 +16,56 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const userRow = (
+      await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
+    )[0];
 
-    if (authError || !authData.user) {
+    if (!userRow) {
       return NextResponse.json(
         { success: false, error: 'Identifiants incorrects.' },
         { status: 401 }
       );
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('id, email, name, role, phone')
-      .eq('id', authData.user.id)
-      .single();
+    const isValidPassword = String(userRow.password) === String(password);
 
-    if (profileError || !profile) {
+    if (!isValidPassword) {
       return NextResponse.json(
-        { success: false, error: "Profil introuvable pour ce compte." },
-        { status: 404 }
+        { success: false, error: 'Identifiants incorrects.' },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json(
+    const userType = (userRow.type as 'client' | 'artisan' | 'admin') || 'client';
+    const redirectTo = getRedirectPath(userType);
+
+    const response = NextResponse.json(
       {
         success: true,
-        user: profile,
-        redirectTo: getRedirectPath(profile.role),
+        user: {
+          id: userRow.uid,
+          email: userRow.email,
+          name: userRow.email.split('@')[0],
+          role: userType,
+          phone: userRow.phone ?? null,
+        },
+        redirectTo,
       },
       { status: 200 }
     );
+
+    response.cookies.set('session-role', userType, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    return response;
   } catch {
     return NextResponse.json(
-      { success: false, error: 'Une erreur serveur s\'est produite.' },
+      { success: false, error: 'Erreur serveur.' },
       { status: 500 }
     );
   }

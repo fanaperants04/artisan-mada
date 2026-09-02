@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,21 +73,57 @@ interface RegionStat {
 const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
 const CHART_COLORS = ['bg-amber-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-rose-500', 'bg-cyan-500'];
 
+const initialCategories: Category[] = [
+  { id: 'menuiserie', name: 'Menuiserie' },
+  { id: 'plomberie', name: 'Plomberie' },
+  { id: 'electricite', name: 'Électricité' },
+  { id: 'peinture', name: 'Peinture' },
+  { id: 'maçonnerie', name: 'Maçonnerie' },
+  { id: 'jardinage', name: 'Jardinage' },
+];
+
+const initialArtisans: Artisan[] = [
+  { id: 'a1', name: 'Rakoto Electric', city: 'Antananarivo', region: 'Analamanga', phone: '+261 34 12 345 67', email: 'rakoto@example.com', status: 'Vérifié', category_id: 'electricite', created_at: '2025-01-12T09:00:00.000Z' },
+  { id: 'a2', name: 'Mina Carrelage', city: 'Toamasina', region: 'Atsinanana', phone: '+261 32 98 765 43', email: 'mina@example.com', status: 'Vérifié', category_id: 'maçonnerie', created_at: '2025-02-10T09:00:00.000Z' },
+  { id: 'a3', name: 'Noro Plomberie', city: 'Fianarantsoa', region: 'Fianarantsoa', phone: '+261 33 45 678 91', email: 'noro@example.com', status: 'En attente', category_id: 'plomberie', created_at: '2025-03-03T09:00:00.000Z' },
+  { id: 'a4', name: 'Lova Peinture', city: 'Antsirabe', region: 'Vakinankaratra', phone: '+261 34 67 890 12', email: 'lova@example.com', status: 'Vérifié', category_id: 'peinture', created_at: '2025-04-09T09:00:00.000Z' },
+  { id: 'a5', name: 'Tiana Jardin', city: 'Mahajanga', region: 'Boeny', phone: '+261 32 76 543 21', email: 'tiana@example.com', status: 'En attente', category_id: 'jardinage', created_at: '2025-05-14T09:00:00.000Z' },
+];
+
+const initialPendingDossiers: Dossier[] = [
+  { id: 'd1', name: 'Mamy Rénovation', city: 'Antananarivo', region: 'Analamanga', phone: '+261 34 00 111 11', email: 'mamy@example.com', status: 'En attente', category_id: 'peinture', created_at: '2025-06-20T09:00:00.000Z' },
+  { id: 'd2', name: 'Jean Select', city: 'Toliara', region: 'Atsimo-Andrefana', phone: '+261 34 00 222 22', email: 'jean@example.com', status: 'En attente', category_id: 'electricite', created_at: '2025-06-24T09:00:00.000Z' },
+];
+
+const initialCategoryStats: CategoryStat[] = [
+  { category_id: 'electricite', category_name: 'Électricité', artisan_count: 8, percentage: 28 },
+  { category_id: 'plomberie', category_name: 'Plomberie', artisan_count: 6, percentage: 21 },
+  { category_id: 'peinture', category_name: 'Peinture', artisan_count: 5, percentage: 17 },
+  { category_id: 'maçonnerie', category_name: 'Maçonnerie', artisan_count: 7, percentage: 24 },
+  { category_id: 'jardinage', category_name: 'Jardinage', artisan_count: 3, percentage: 10 },
+];
+
+const initialRegionStats: RegionStat[] = [
+  { region: 'Analamanga', artisan_count: 12, percentage: 40 },
+  { region: 'Atsinanana', artisan_count: 7, percentage: 24 },
+  { region: 'Fianarantsoa', artisan_count: 5, percentage: 17 },
+  { region: 'Vakinankaratra', artisan_count: 4, percentage: 13 },
+  { region: 'Boeny', artisan_count: 2, percentage: 6 },
+];
+
 export default function AdminDashboard() {
-  const supabase = createClient();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'analytics' | 'pending' | 'artisans'>('analytics');
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [pendingDossiers, setPendingDossiers] = useState<Dossier[]>([]);
-  const [artisans, setArtisans] = useState<Artisan[]>([]);
-  const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
-  const [regionStats, setRegionStats] = useState<RegionStat[]>([]);
-  const [totalArtisansEver, setTotalArtisansEver] = useState(0);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [pendingDossiers, setPendingDossiers] = useState<Dossier[]>(initialPendingDossiers);
+  const [artisans, setArtisans] = useState<Artisan[]>(initialArtisans);
+  const [categoryStats, setCategoryStats] = useState<CategoryStat[]>(initialCategoryStats);
+  const [regionStats, setRegionStats] = useState<RegionStat[]>(initialRegionStats);
+  const [totalArtisansEver, setTotalArtisansEver] = useState(initialArtisans.length + 3);
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
-  const [adminId, setAdminId] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -100,46 +135,20 @@ export default function AdminDashboard() {
     [categories]
   );
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(() => {
     setLoading(true);
-
-    const [
-      { data: userData },
-      { data: categoriesData },
-      { data: dossiersData },
-      { data: artisansData },
-      { data: categoryStatsData },
-      { data: regionStatsData },
-      { count: totalCount },
-    ] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase.from('categories').select('id, name').order('name'),
-      supabase
-        .from('pending_dossiers')
-        .select('id, name, city, region, phone, email, status, category_id, created_at')
-        .eq('status', 'En attente')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('artisans')
-        .select('id, name, city, region, phone, email, status, category_id, created_at')
-        .order('created_at', { ascending: false }),
-      supabase.from('category_stats').select('*'),
-      supabase.from('region_stats').select('*'),
-      supabase.from('artisans').select('id', { count: 'exact', head: true }),
-    ]);
-
-    setAdminId(userData.user?.id ?? null);
-    setCategories(categoriesData ?? []);
-    setPendingDossiers(dossiersData ?? []);
-    setArtisans(artisansData ?? []);
-    setCategoryStats((categoryStatsData ?? []).filter((c) => c.artisan_count > 0));
-    setRegionStats(regionStatsData ?? []);
-    setTotalArtisansEver(totalCount ?? 0);
+    setCategories(initialCategories);
+    setPendingDossiers(initialPendingDossiers);
+    setArtisans(initialArtisans);
+    setCategoryStats(initialCategoryStats);
+    setRegionStats(initialRegionStats);
+    setTotalArtisansEver(initialArtisans.length + 3);
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => loadData(), 250);
+    return () => clearTimeout(timer);
   }, [loadData]);
 
   const monthlyRegistrations = useMemo(() => {
@@ -159,63 +168,37 @@ export default function AdminDashboard() {
 
   const maxRegCount = Math.max(1, ...monthlyRegistrations.map((d) => d.count));
 
-  const handleValidateDossier = async (dossier: Dossier) => {
-    const { error: insertError } = await supabase.from('artisans').insert({
+  const handleValidateDossier = (dossier: Dossier) => {
+    const newArtisan: Artisan = {
+      id: `local-${dossier.id}`,
       name: dossier.name,
-      category_id: dossier.category_id,
       city: dossier.city,
       region: dossier.region,
       phone: dossier.phone,
       email: dossier.email,
       status: 'Vérifié',
-    });
+      category_id: dossier.category_id,
+      created_at: new Date().toISOString(),
+    };
 
-    if (insertError) {
-      showNotification(`Erreur lors de la validation : ${insertError.message}`);
-      return;
-    }
-
-    await supabase
-      .from('pending_dossiers')
-      .update({ status: 'Validé', reviewed_by: adminId, reviewed_at: new Date().toISOString() })
-      .eq('id', dossier.id);
-
+    setArtisans((prev) => [newArtisan, ...prev]);
     setPendingDossiers((prev) => prev.filter((d) => d.id !== dossier.id));
+    setTotalArtisansEver((prev) => prev + 1);
     showNotification(`Le dossier de ${dossier.name} a été validé avec succès.`);
-    loadData();
   };
 
-  const handleRejectDossier = async (dossier: Dossier) => {
-    await supabase
-      .from('pending_dossiers')
-      .update({ status: 'Refusé', reviewed_by: adminId, reviewed_at: new Date().toISOString() })
-      .eq('id', dossier.id);
-
+  const handleRejectDossier = (dossier: Dossier) => {
     setPendingDossiers((prev) => prev.filter((d) => d.id !== dossier.id));
     showNotification(`Le dossier de ${dossier.name} a été rejeté.`);
   };
 
-  const handleToggleStatus = async (artisan: Artisan) => {
+  const handleToggleStatus = (artisan: Artisan) => {
     const newStatus = artisan.status === 'Vérifié' ? 'En attente' : 'Vérifié';
-    const { error } = await supabase.from('artisans').update({ status: newStatus }).eq('id', artisan.id);
-
-    if (error) {
-      showNotification(`Erreur : ${error.message}`);
-      return;
-    }
-
     setArtisans((prev) => prev.map((a) => (a.id === artisan.id ? { ...a, status: newStatus } : a)));
     showNotification(`Le statut de ${artisan.name} est maintenant : ${newStatus}`);
   };
 
-  const handleDeleteArtisan = async (artisan: Artisan) => {
-    const { error } = await supabase.from('artisans').delete().eq('id', artisan.id);
-
-    if (error) {
-      showNotification(`Erreur : ${error.message}`);
-      return;
-    }
-
+  const handleDeleteArtisan = (artisan: Artisan) => {
     setArtisans((prev) => prev.filter((a) => a.id !== artisan.id));
     showNotification(`L'artisan ${artisan.name} a été supprimé.`);
   };
@@ -261,8 +244,8 @@ export default function AdminDashboard() {
             <ArrowLeft size={14} /> Retour au site
           </Link>
           <button
-            onClick={async () => {
-              await supabase.auth.signOut();
+            onClick={() => {
+              localStorage.removeItem('artisansmada-user');
               router.push('/login');
               router.refresh();
             }}

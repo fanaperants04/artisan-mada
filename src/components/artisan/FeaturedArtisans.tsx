@@ -1,34 +1,16 @@
-import { createClient } from '@/lib/supabase/server';
 import ArtisanCard from './ArtisanCard';
 import { Sparkles } from 'lucide-react';
 
-export default async function FeaturedArtisans() {
-  const supabase = await createClient();
+const artisans = [
+  { id: 'a1', name: 'Rakoto Electric', city: 'Antananarivo', phone: '+261 34 12 345 67', image: undefined, category: 'Électricité', rating: 4.9 },
+  { id: 'a2', name: 'Mina Carrelage', city: 'Toamasina', phone: '+261 32 98 765 43', image: undefined, category: 'Maçonnerie', rating: 4.8 },
+  { id: 'a3', name: 'Noro Plomberie', city: 'Fianarantsoa', phone: '+261 33 45 678 91', image: undefined, category: 'Plomberie', rating: 5.0 },
+  { id: 'a4', name: 'Lova Peinture', city: 'Antsirabe', phone: '+261 34 67 890 12', image: undefined, category: 'Peinture', rating: 4.7 },
+  { id: 'a5', name: 'Tiana Jardin', city: 'Mahajanga', phone: '+261 32 76 543 21', image: undefined, category: 'Jardinage', rating: 4.6 },
+  { id: 'a6', name: 'Andry Menuiserie', city: 'Antananarivo', phone: '+261 34 12 777 21', image: undefined, category: 'Menuiserie', rating: 4.8 },
+];
 
-  const { data: artisans } = await supabase
-    .from('artisans')
-    .select('id, name, city, phone, image, category_id')
-    .eq('status', 'Vérifié')
-    .eq('is_available', true)
-    .limit(6);
-
-  const artisanIds = (artisans ?? []).map((a) => a.id);
-  const categoryIds = [...new Set((artisans ?? []).map((a) => a.category_id))];
-
-  const [{ data: reputations }, { data: categories }] = await Promise.all([
-    artisanIds.length
-      ? supabase.from('artisan_reputation').select('artisan_id, avg_rating').in('artisan_id', artisanIds)
-      : Promise.resolve({ data: [] as { artisan_id: string; avg_rating: number }[] }),
-    categoryIds.length
-      ? supabase.from('categories').select('id, name').in('id', categoryIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ]);
-
-  const ratingFor = (id: string) =>
-    reputations?.find((r) => r.artisan_id === id)?.avg_rating ?? 4.5;
-  const categoryNameFor = (id: string) =>
-    categories?.find((c) => c.id === id)?.name ?? '';
-
+export default function FeaturedArtisans() {
   return (
     <section className="py-10 sm:py-16 md:py-20 px-4 sm:px-6 bg-gradient-to-b from-white to-gray-50/50">
       <div className="max-w-6xl mx-auto">
@@ -54,11 +36,11 @@ export default async function FeaturedArtisans() {
               artisan={{
                 id: artisan.id,
                 name: artisan.name,
-                category: categoryNameFor(artisan.category_id),
+                category: artisan.category,
                 location: artisan.city,
                 phone: artisan.phone ?? undefined,
                 image: artisan.image ?? undefined,
-                rating: ratingFor(artisan.id),
+                rating: artisan.rating,
               }}
             />
           ))}

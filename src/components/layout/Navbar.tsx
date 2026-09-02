@@ -6,7 +6,6 @@ import { Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { User } from '@/types/user';
 import { getRedirectPath } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/client';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -17,43 +16,18 @@ export default function Navbar() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    let mounted = true;
-
-    const loadUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        if (mounted) setCurrentUser(null);
-        return;
+    try {
+      const stored = localStorage.getItem('artisansmada-user');
+      if (stored) {
+        setCurrentUser(JSON.parse(stored) as User);
       }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('id, email, name, role, phone')
-        .eq('id', user.id)
-        .single();
-
-      if (mounted) setCurrentUser(profile as User | null);
-    };
-
-    loadUser();
-
-    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
-      loadUser();
-    });
-
-    return () => {
-      mounted = false;
-      subscription.subscription.unsubscribe();
-    };
+    } catch {
+      setCurrentUser(null);
+    }
   }, []);
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    localStorage.removeItem('artisansmada-user');
     setCurrentUser(null);
     router.push('/');
     router.refresh();
@@ -89,6 +63,9 @@ export default function Navbar() {
           </Link>
           <Link href="/#artisans" className="text-gray-700 hover:text-blue-600 transition-colors">
             Artisans à la une
+          </Link>
+          <Link href="/artisans" className="text-gray-700 hover:text-blue-600 transition-colors">
+            Tous les artisans
           </Link>
 
           {currentUser ? (
@@ -144,6 +121,9 @@ export default function Navbar() {
           </Link>
           <Link href="/#categories" className="text-gray-800 hover:text-blue-600 py-1 text-base font-semibold" onClick={() => setIsOpen(false)}>
             Catégories
+          </Link>
+          <Link href="/artisans" className="text-gray-800 hover:text-blue-600 py-1 text-base font-semibold" onClick={() => setIsOpen(false)}>
+            Tous les artisans
           </Link>
 
           {currentUser ? (

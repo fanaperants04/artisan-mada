@@ -1,7 +1,6 @@
 import { Hammer, Zap, Wrench, Building2, Paintbrush, Home, ArrowRight, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { createClient } from '@/lib/supabase/server';
 
 const ICONS: Record<string, LucideIcon> = { Hammer, Zap, Wrench, Building2, Paintbrush, Home };
 
@@ -14,16 +13,18 @@ const COLORS = [
   'bg-emerald-50 text-emerald-600 border-emerald-200',
 ];
 
-export default async function Categories() {
-  const supabase = await createClient();
+const categories = [
+  { id: 'electricite', name: 'Électricité', icon: 'Zap', count: 18 },
+  { id: 'plomberie', name: 'Plomberie', icon: 'Wrench', count: 14 },
+  { id: 'menuiserie', name: 'Menuiserie', icon: 'Hammer', count: 11 },
+  { id: 'peinture', name: 'Peinture', icon: 'Paintbrush', count: 9 },
+  { id: 'maçonnerie', name: 'Maçonnerie', icon: 'Building2', count: 16 },
+  { id: 'jardinage', name: 'Jardinage', icon: 'Home', count: 7 },
+];
 
-  const [{ data: categories }, { data: stats }] = await Promise.all([
-    supabase.from('categories').select('id, name, icon').order('name'),
-    supabase.from('category_stats').select('category_id, artisan_count'),
-  ]);
-
+export default function Categories() {
   const countFor = (categoryId: string) =>
-    stats?.find((s) => s.category_id === categoryId)?.artisan_count ?? 0;
+    categories.find((category) => category.id === categoryId)?.count ?? 0;
 
   return (
     <section id="categories" className="py-10 sm:py-16 md:py-20 px-4 sm:px-6 bg-white">

@@ -11,10 +11,11 @@ interface ArtisanCardProps {
 
 export default function ArtisanCard({ artisan }: ArtisanCardProps) {
   const initials = artisan.name
-    .split(' ')
-    .map((n) => n[0])
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part: string) => part[0])
     .join('')
-    .substring(0, 2);
+    .slice(0, 2);
 
   return (
     <Card className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border border-gray-100 bg-white overflow-hidden flex flex-col justify-between rounded-2xl">
