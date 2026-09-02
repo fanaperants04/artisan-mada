@@ -2,15 +2,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import ArtisanCard from '@/components/artisan/ArtisanCard';
 import { Sparkles, Search } from 'lucide-react';
-
-const artisanSeed = [
-  { id: 'a1', name: 'Rakoto Electric', category: 'Électricité', location: 'Antananarivo', phone: '+261 34 12 345 67', rating: 4.9 },
-  { id: 'a2', name: 'Mina Carrelage', category: 'Maçonnerie', location: 'Toamasina', phone: '+261 32 98 765 43', rating: 4.8 },
-  { id: 'a3', name: 'Noro Plomberie', category: 'Plomberie', location: 'Fianarantsoa', phone: '+261 33 45 678 91', rating: 5.0 },
-  { id: 'a4', name: 'Lova Peinture', category: 'Peinture', location: 'Antsirabe', phone: '+261 34 67 890 12', rating: 4.7 },
-  { id: 'a5', name: 'Tiana Jardin', category: 'Jardinage', location: 'Mahajanga', phone: '+261 32 76 543 21', rating: 4.6 },
-  { id: 'a6', name: 'Andry Menuiserie', category: 'Menuiserie', location: 'Antananarivo', phone: '+261 34 12 777 21', rating: 4.8 },
-];
+import { db } from '@/db/client';
+import { craftspeople } from '@/db/schema';
 
 export default async function ArtisansPage({
   searchParams,
@@ -25,9 +18,16 @@ export default async function ArtisansPage({
   const selectedCity = typeof params.city === 'string' ? params.city : '';
   const search = typeof params.q === 'string' ? params.q : '';
 
-  const artisans = artisanSeed.map((artisan) => ({
-    ...artisan,
+  const allCraftspeople = await db.select().from(craftspeople);
+
+  const artisans = allCraftspeople.map((craft) => ({
+    id: craft.id_craft,
+    name: craft.nom_business || 'Artisan',
+    category: craft.category || 'Autre',
+    location: craft.location || 'Madagascar',
+    phone: undefined,
     image: undefined,
+    rating: 4.8,
   }));
 
   const categories = [...new Set(artisans.map((artisan) => artisan.category).filter(Boolean))].sort();
